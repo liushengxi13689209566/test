@@ -32,12 +32,13 @@
 
 typedef struct information{
     int flag ;  // 0 注册 ，1 登录 
-    int  state ;    //上线与离线的状态 0 离线， 1 上线 ,避免重复登录及注册,m默认为 0
+    int  state ;    //上线与离线的状态 0 离线， 1 上线 ,避免重复登录及注册,m 默认为 0
     int QQ ;
-    char username[32];
+    char username[32] ; 
     char passwd[32] ;
     char str[52];
-//  char to[2000];
+    char to[200];
+    int num ; //代表对方的QQ 号
 }TT ; //代表结构体
 
 

@@ -6,12 +6,19 @@
 #define LISTENQ 20
 // 0-------------注册
 // 1------------登录
-// 3------------注册成功
-// 4------------登录成功
-//
-int join(TT join_msg ,int conn_fd) ; //注册
+// 2------------登录成功
+//3-------------下线
+//4------------添加好友
+//5------------添加好友成功
+//6------------添加好友失败
+//6------------delete 好友
+
+int join(TT server_msg ,int conn_fd) ;    //注册
 void  *fun(void *arg) ;
-int sign_in(TT sign_msg ,int conn_fd)  ;//登录
+int sign_in(TT server_msg ,int conn_fd)  ;//登录
+int add_friend(TT server_msg,int conn_fd)  ;   //添加好友  num 代表对方的QQ  ||  自己的QQ 是真正的QQ
+int delete_friend(TT server_msg,int conn_fd) ;    //delete 好友  num 代表对方的QQ   ||   自己的QQ 是真正的QQ
+int list_friend(TT server_msg ,int conn_fd)  ;  //
     
 int main(void )
 {
@@ -70,7 +77,7 @@ int main(void )
                 conn_fd =  events[i].data.fd ;
                 //printf("-------------------------------------------lianjie is OK\n");
                 if(pthread_create(&tid,NULL ,(void *)fun ,(void *)&conn_fd)   < 0  )      myerror("server pthread_create ",__LINE__);
-                //printf("the recv is %s \n",recv_buf.str);
+                //printf("the recv is %s \n",server_msg.str);
             }
         }
     }
@@ -79,55 +86,56 @@ int main(void )
 void  *fun(void *arg)
 {
    // printf("*****************************\n");
-    TT recv_buf ;
+    TT server_msg ;
     int conn_fd = *(int *)arg;
     int t ;
-    memset(&recv_buf,0,sizeof(TT));
-    t = recv(conn_fd,&recv_buf,sizeof(TT),0) ;/////////////////////////////////////////////接受信息!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    memset(&server_msg,0,sizeof(TT));
+    t = recv(conn_fd,&server_msg,sizeof(TT),0) ;/////////////////////////////////////////////接受信息!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //    if(t== 0)     修改状态信息为0 
-    printf("flag  ==  %d\n",recv_buf.flag);
-    switch(recv_buf.flag)
+    printf("****************************flag  ==  %d\n",server_msg.flag);
+    switch(server_msg.flag)
     {
-        case 0: join(recv_buf,conn_fd); /*printf("the recv is %s\n",recv_buf.str) ; */ break; //根据类型态调用函数
-        case 1: sign_in(recv_buf,conn_fd);      break ; //登录
-        case 2: break ;
-        case 3: break;
-        case 4: break;
+        case 0: join(server_msg,conn_fd); /*printf("the recv is %s\n",server_msg.str) ; */ break; //根据类型态调用函数
+        case 1: sign_in(server_msg,conn_fd);      break ; //登录
+        case 3:  break ;//下线就修改状态，清空conn_fd
+        case 4:add_friend(server_msg,conn_fd) ;  break;
+        case 7:delete_friend(server_msg,conn_fd);  break;
+        case 9: list_friend (server_msg,conn_fd) ;   break;
+        case 10:  break ;
     }
 }
-int join(TT join_msg ,int conn_fd)    //注册,1旦注册成功就创建属于它的一张表
+int join(TT server_msg ,int conn_fd)    //注册,1旦注册成功就创建属于它的一张表
 {
     char query1[100];
     char query2[100];
+//    char conn[50]= "set user_data utf8" ;
     int t ;
-    TT send_buf ;
-    memset(&send_buf,0,sizeof(TT));
+
     memset(query1,0,sizeof(query1));
     memset(query2,0,sizeof(query2));
 
     MYSQL *mysql = mysql_init(NULL);
     if(!mysql)   myerror("server mysql_init",__LINE__);
     mysql_connect(mysql) ;
-    sprintf(query1,"insert into user_data values('0',%d,'%s','%s',%d);",join_msg.QQ ,join_msg.username ,join_msg.passwd ,conn_fd );
-
+    sprintf(query1,"insert into user_data values('0',%d,'%s','%s',%d);",server_msg.QQ ,server_msg.username ,server_msg.passwd ,conn_fd );
+  //  mysql_real_query(mysql,conn,strlen(conn));;
     t= mysql_real_query(mysql ,query1,strlen(query1));
     if(t != 0)         
     {
-        strcpy(send_buf.str,"重复注册！！");
-        send(conn_fd,&send_buf,sizeof(TT),0 ) ;
+        strcpy(server_msg.str,"重复注册！！");
+        send(conn_fd,&server_msg,sizeof(TT),0 ) ;
     }
     else                       //注册成功！！ 
     {
-        send_buf.flag =  3 ; 
-        strcpy(send_buf.str,"注册成功！！,请登录～～\n") ;  
-        sprintf(query2,"create table tb_%d(friend_QQ int ,friendname char(32),conn_fd int) ;",join_msg.QQ); //注册成功，创建一张属于它的表
+        strcpy(server_msg.str,"注册成功！！,请登录～～\n") ;  
+        send(conn_fd,&server_msg,sizeof(TT),0);  
+        sprintf(query2,"create table tb_%d(friend_QQ int ,friendname char(32),conn_fd int) ;",server_msg.QQ); //注册成功，创建一张属于它的表
         mysql_real_query(mysql ,query2,strlen(query2));
-        send(conn_fd,&send_buf,sizeof(TT),0);  
     }
     close_connection(mysql);
     return 0;
 }
-int sign_in(TT sign_msg ,int conn_fd)      //登录
+int sign_in(TT server_msg ,int conn_fd)      //登录
 {
     int t ;
     MYSQL_RES *res ;
@@ -135,19 +143,20 @@ int sign_in(TT sign_msg ,int conn_fd)      //登录
     char query1[150] ;
     char query2[150] ;
     char query3[150] ;
-    TT send_buf ;
-    memset(&send_buf,0,sizeof(TT));
+    char query4[150] ;
+  
     memset(query1,0,sizeof(query1));
     memset(query2,0,sizeof(query2));
     memset(query3,0,sizeof(query3));
+    memset(query4,0,sizeof(query4));
 
     MYSQL *mysql = mysql_init(NULL);
     if(!mysql)   myerror("server mysql_init",__LINE__);
     mysql_connect(mysql) ;
 
-    sprintf(query1 ,"select  * from user_data where QQ =%d ;",sign_msg.QQ ) ;
-    sprintf(query2 ,"select  * from user_data where QQ =%d and state='0';",sign_msg.QQ ) ;
-    sprintf(query3 ,"select  * from user_data where QQ =%d and passwd='%s';",sign_msg.QQ ,sign_msg.passwd) ;
+    sprintf(query1 ,"select  * from user_data where QQ =%d ;",server_msg.QQ ) ;
+    sprintf(query2 ,"select  * from user_data where QQ =%d and state='0';",server_msg.QQ ) ;
+    sprintf(query3 ,"select  * from user_data where QQ =%d and passwd='%s';",server_msg.QQ ,server_msg.passwd) ;
 
 
     t= mysql_real_query(mysql ,query1,strlen(query1));
@@ -158,8 +167,8 @@ int sign_in(TT sign_msg ,int conn_fd)      //登录
 
     if(mysql_num_rows(res) ==  0 ) 
     { 
-        strcpy(send_buf.str,"用户不存在～～"); 
-        send(conn_fd,&send_buf,sizeof(TT),0); 
+        strcpy(server_msg.str,"用户不存在～～"); 
+        send(conn_fd,&server_msg,sizeof(TT),0); 
     }
     else 
     {
@@ -169,8 +178,8 @@ int sign_in(TT sign_msg ,int conn_fd)      //登录
     }
     if(mysql_num_rows(res) == 0)
     {
-        strcpy(send_buf.str,"重复登录\n");
-        send(conn_fd,&send_buf,sizeof(TT),0); 
+        strcpy(server_msg.str,"重复登录\n");
+        send(conn_fd,&server_msg,sizeof(TT),0); 
     }
     else 
     {
@@ -180,14 +189,153 @@ int sign_in(TT sign_msg ,int conn_fd)      //登录
     }
     if(mysql_num_rows(res) == 0)
     {
-        strcpy(send_buf.str,"密码不匹配\n");
-        send(conn_fd,&send_buf,sizeof(TT),0) ;
+        strcpy(server_msg.str,"密码不匹配\n");
+        send(conn_fd,&server_msg,sizeof(TT),0) ;
     }
     else 
     {
-        send_buf.flag= 4 ;
-        strcpy(send_buf.str,"登录成功！\n") ;
-        send(conn_fd,&send_buf,sizeof(TT),0); 
+        server_msg.flag=  2 ;
+        strcpy(server_msg.str,"登录成功！\n") ; //登录成功 ，修改状态为1 
+        send(conn_fd,&server_msg,sizeof(TT),0); 
+        sprintf(query4 ,"update user_data set state='1'  where QQ =%d and passwd='%s';",server_msg.QQ ,server_msg.passwd) ;
+        t= mysql_real_query(mysql ,query4,strlen(query4));
+        if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     }
+    close_connection(mysql);
 }
+int add_friend(TT server_msg,int conn_fd)    //添加好友  num 代表对方的QQ  ||  自己的QQ 是真正的QQ
+{
+    printf("into add_friend\n");
+    int    t ;
+    char query1[150] ;   
+    char query2[150] ;
+    MYSQL_RES *res ;
+    MYSQL_ROW row ;
+    memset(query1,0,sizeof(query1));
+     memset(query2,0,sizeof(query2));
+  
+    MYSQL *mysql = mysql_init(NULL);
+    if(!mysql)   myerror("server mysql_init",__LINE__);
+    mysql_connect(mysql) ;
+
+    sprintf(query1 ,"select  conn_fd from user_data where QQ =%d ;",server_msg.num ) ;
+    sprintf(query2 ,"insert into tb_%d  select QQ,username,conn_fd from user_data where QQ=%d ;",server_msg.QQ ,server_msg.num) ;
+    printf("query == %s\n",query1 );
+    printf("query == %s\n",query2);
+  
+    t= mysql_real_query(mysql ,query1,strlen(query1));
+    if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    //printf("t  ==     %d\n",t);
+
+    res = mysql_store_result(mysql)  ;
+   // printf("res ==     %d\n",res);
+
+    if( !res )     myerror("server mysql_store_result",__LINE__) ;
+    printf("mysql_num_rows == %d\n",mysql_num_rows(res) ) ;
+    if(mysql_num_rows(res) ==  0 ) 
+    { 
+        strcpy(server_msg.str,"用户不存在～～");  //客户端打印这句话 
+        send(conn_fd,&server_msg,sizeof(TT),0); 
+    }
+    else  //find   it ，给他发送消息,进行验证
+    {
+        /*row=mysql_fetch_row(res);
+        printf("frien conn_fd  == %d\n", *row[0]) ;
+        sprintf(server_msg.str,"QQ= %d 的朋友想要加你为好友，你愿意吗？？",server_msg.QQ);
+        if(t != 0 )    myerror("server mysql_real_query",__LINE__);*/
+        t= mysql_real_query(mysql ,query2,strlen(query2));   // 插入自己的表中
+        if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+        strcpy(server_msg.str,"添加好友成功");  //客户端打印这句话 
+        server_msg.flag =  5 ;
+        send(conn_fd,&server_msg,sizeof(TT),0); 
+
+    }
+    close_connection(mysql);
+}
+
+int delete_friend(TT server_msg,int conn_fd)    //delete 好友  num 代表对方的QQ   ||   自己的QQ 是真正的QQ
+{
+    int    t ;
+    char query1[150] ;   
+    char query2[150] ;
+    MYSQL_RES *res ;
+    MYSQL_ROW row ;
+    memset(query1,0,sizeof(query1));
+     memset(query2,0,sizeof(query2));
+  
+    MYSQL *mysql = mysql_init(NULL);
+    if(!mysql)   myerror("server mysql_init",__LINE__);
+    mysql_connect(mysql) ;
+
+    sprintf(query1 ,"select  conn_fd from user_data where QQ =%d ;",server_msg.num ) ;
+    sprintf(query2 ,"delete  from tb_%d  where friend_QQ=%d;",server_msg.QQ ,server_msg.num) ;
+    printf("query == %s\n",query1 );
+    printf("query == %s\n",query2);
+  
+    t= mysql_real_query(mysql ,query1,strlen(query1));
+    if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    //printf("t  ==     %d\n",t);
+
+    res = mysql_store_result(mysql)  ;
+   // printf("res ==     %d\n",res);
+
+    if( !res )     myerror("server mysql_store_result",__LINE__) ;
+    printf("mysql_num_rows == %d\n",mysql_num_rows(res) ) ;
+    if(mysql_num_rows(res) ==  0 ) 
+    { 
+        strcpy(server_msg.str,"用户不存在～～");  //客户端打印这句话 
+        send(conn_fd,&server_msg,sizeof(TT),0); 
+    }
+    else  //find   it ，给他发送消息,进行验证
+    {
+       
+        t= mysql_real_query(mysql ,query2,strlen(query2));  
+        if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+        strcpy(server_msg.str,"删除好友成功，友谊可贵望珍惜\n");  //客户端打印这句话 
+         //server_msg.flag =  8 ;
+        send(conn_fd,&server_msg,sizeof(TT),0); 
+    }
+    close_connection(mysql);
+}
+int list_friend(TT server_msg ,int conn_fd)    //
+{
+    char query1[ 150];
+    memset(query1,0,sizeof(query1));
+    MYSQL_RES *res;         // 返回查询结果
+    MYSQL_ROW row;          // 返回行数据
+    int t ;
+
+    MYSQL *mysql = mysql_init(NULL);
+    if(!mysql)   myerror("server mysql_init",__LINE__);
+    mysql_connect(mysql) ;
+
+    sprintf(query1,"   select    *   from  tb_%d  ;",server_msg.QQ) ;
+    printf("into list_friend and query1 == %s\n",query1);
+
+    t= mysql_real_query(mysql ,query1,strlen(query1));
+    if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+
+     res = mysql_store_result(mysql)  ;
+     if( !res )     myerror("server mysql_store_result",__LINE__) ;
+
+     while (row = mysql_fetch_row(res))      //找到数据 
+     {  
+            printf("*row[0] ==  %d\n",atoi(row[0]));
+            printf("row[1] == %s\n",row[1] ) ;
+            server_msg.num = atoi(row[0] );
+            strcpy(server_msg.str,row[1]) ;
+            send(conn_fd,&server_msg ,sizeof(TT),0) ;
+     }  
+     server_msg.flag   =   10  ;
+     send(conn_fd,&server_msg ,sizeof(TT),0) ;
+     close_connection(mysql);
+}
+
+
+
+
+
+
+
+
 
