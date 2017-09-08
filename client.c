@@ -15,6 +15,7 @@ int  to_who ;
 U_L  *head ; //好友列表头指针
 TT  *mhead ; //消息盒子头指针
 int  qun_num ; //群号
+int ss= 0 ;
  
 
 TT  *init_mhead()
@@ -52,6 +53,7 @@ int lookup_chat_reconds(TT client_msg) ;
 int real_qun_chat(TT client_msg) ;
 int  invite_one(TT client_msg) ;
 int keep_file(TT client_msg) ;
+int real_real_qun_chat(TT client_msg) ;
 
 
 int add_mhead(TT client_msg)   // 加入消息盒子的函数
@@ -93,7 +95,7 @@ int  client_join(int conn_fd )     //注册函数
             printf(RED"\n\t\t\t\tpasswd :"END) ;
             scanf("%s",client_msg.passwd);
             if(strcmp(temp ,client_msg.passwd) != 0)
-             printf("两次密码不同！！\n");
+             printf(RED"\n\n\n\t\t\t 两 次 密 码 不 同 ！ ！ \n"END);
     }while(strcmp(temp,client_msg.passwd) !=  0 ) ;
     system("stty echo");
 
@@ -152,7 +154,7 @@ int read_mysql_to_list(TT client_msg)  //flag ==  2
     while(1)
     {
         recv(I_conn_fd,&client_msg,sizeof(TT),0) ;
-        printf("into read_mysql_to_list and client_msg.to == %d\n",client_msg.to);
+        //printf("into read_mysql_to_list and client_msg.to == %d\n",client_msg.to);
         add_user_list(client_msg.to) ;
         if(client_msg.state ==  -8)  break;     //发完为止
     }
@@ -175,6 +177,8 @@ int get_one_chat(TT client_msg )
 
 int get_group_chat( TT client_msg)
 {
+    printf("client_msg.to  == %d \n",client_msg.to);
+    printf("qun_num   ==  %d \n",qun_num);
     if(client_msg.to == qun_num)
     {
         //如果是当前群则直接输出
@@ -222,10 +226,30 @@ int my_recv(void)
             get_one_chat( massage );
             break;
         case 9:
-            get_group_chat(massage);  //群聊消息
+           if(massage.state ==   -100 )
+            {
+                ss= 1 ;  
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            }
+            else  if(massage.state ==   -99  )
+            {  
+                printf(RED"\t  亲，您  不  在   此   群   中  哦  ！！\n"END) ;    
+                ss= 1 ; 
+            }
+             else if(massage.state  ==  -98  )
+             {
+                while(1){
+                    if (real_real_qun_chat(massage) == 0)
+                        break;
+                }
+            }
+            else 
+                get_group_chat(massage);  //群聊消息
             break;
         case 12:
-            if(massage.state ==  -1) {
+            if(massage.state == -100)
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            else if(massage.state ==  -1) {
                 printf(BLUE"\t%d申请加入群%d,请到消息盒子处理\n"END,massage.QQ,massage.to);
                 add_mhead(massage);
             } else if(massage.state == 2) {
@@ -233,18 +257,22 @@ int my_recv(void)
             } else if(massage.state == 1) {
                 printf(RED"群主%d同意你进入群%d\n"END,massage.QQ ,massage.to);
             } else if(massage.state == -2) {
-                printf(RED"你已是该群成员,无需重复添加\n"END);
+                printf(RED"\t你已是该群成员,无需重复添加\n"END);
                 sleep(1);
             }
             break;
         case 13:
-            if(massage.state ==  -2 ) 
+            if(massage.state ==   -100 )
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            else if(massage.state  ==  -2 ) 
                   printf(BLUE"\t 你 不 是 群 主， 无 法 解 散 群 \n"END,massage.to);
-            else  printf(RED"\t群%d  已 被 解散！！！ \n"END,massage.to);
+            else  printf(RED"\t 群%d  已 被 解散！！！ \n"END,massage.to);
             sleep(1);
             break;
         case 14:
-            if(massage.state ==  -2 ) 
+            if(massage.state ==   -100 )
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            else if(massage.state ==  -2 ) 
                 printf(BLUE"\t你不是群主，无法踢人，把你牛逼的\n"END);
             else if(massage.state == -1 )
                 printf(RED"\t好友%d 没在群%d 中\n"END,massage.num,massage.to);
@@ -255,14 +283,27 @@ int my_recv(void)
             sleep(1);
             break;
         case 15:
-            if(massage.state ==  -2 ) 
-                printf(BLUE"\t你不在该群内，无法查看群成员\n"END);
+            if(massage.state ==   -100 )
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            else if(massage.state ==  -2 ) 
+                printf(BLUE"\t你 不 在 该 群  内 ， 无  法  查 看  群 成  员\n"END);
             else 
                 printf(BLUE"\t\tQQ : "END) ;
                 printf("  %d \n",massage.num) ;
             break;
-        case 16:
-            printf("\e[1;33m%d\e[0m :\e[1;34m%s\e[0m at %s\n",massage.QQ,massage.str,massage.passwd);
+        case 16 :
+         if(massage.state ==   -100 )
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            else  if(massage.state ==   -99  )
+                printf(RED"\t  亲，您  不  在   此   群   中  哦  ！！\n"END) ;    
+            else 
+                printf("\e[1;33m%d\e[0m :\e[1;34m%s\e[0m at %s\n",massage.QQ,massage.str,massage.passwd);
+            break;
+        case 17 :
+         if(massage.state    ==   -100 )
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+         else  
+                printf(RED"\t 你  已  成  功  退  出  群%d\n"END,massage.to);
             break;
         case 18:
             if( massage.state ==   -1 )   //正在传输
@@ -305,7 +346,11 @@ int my_recv(void)
             break;
         case 10:
             //邀人
-            if(massage.state ==  -1) {
+            if(massage.state == -100)
+                printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
+            else  if(massage.state ==   -99  )
+                 printf(RED"\t  亲，您  不  在   此   群   中  哦  ！！\n"END) ;    
+            else if(massage.state ==  -1) {
                 printf(BLUE"\t%d邀请你加入群%d,请到消息盒子处理\n"END,massage.QQ,massage.to);
                 add_mhead(massage);
             } else if(massage.state == 2) {
@@ -420,7 +465,7 @@ int send_file(TT client_msg ,int file_fd)
     if( (sum_len = lseek(file_fd,0,SEEK_END)) < 0 )
         myerror("lseek in send_file",__LINE__);
     lseek(file_fd,0,SEEK_SET) ;
-    printf(YELLOW"\n\n\t\t\t\t传 输 文 件 开 始 > > > > > "END);
+  
     while(sum != sum_len )     //服务器不需要知道文件有多大，发完就完了啊
     {
    
@@ -429,7 +474,7 @@ int send_file(TT client_msg ,int file_fd)
 
         file_len=read(file_fd,read_buf, 128 ) ;
 
-        memcpy(client_msg.str,read_buf,file_len);   //把文件内容拷贝到client.msg.str
+        memcpy(client_msg.str,read_buf,file_len);    //把文件内容拷贝到client.msg.str
         sum = sum + file_len ;
 
         strcpy(client_msg.passwd,temp);
@@ -440,7 +485,7 @@ int send_file(TT client_msg ,int file_fd)
         client_msg.state  = -1 ;
 
         send(I_conn_fd,&client_msg,sizeof(TT),0) ;
-        usleep(100000);
+        usleep(10000);
     }
    
     printf(BLUE"\n\n\t\t\t\t传 输 文 件 结 束 < < < < "END);
@@ -484,6 +529,8 @@ int init_file(TT client_msg)
         sleep(1);
         return 0;
     }
+
+    printf(YELLOW"\n\n\t\t\t\t传 输 文 件 开 始 > > > > > "END);
 
     int temp ;
     temp = strlen(name);
@@ -534,7 +581,7 @@ int  friend_list(TT client_msg )
 
 int lookup_chat_reconds(TT client_msg)
 {
-    printf("\033c");
+    //printf("\033c");
     printf("\n\n\n\n\n\n\t\t\t\t请输入你要查看聊天记录的好友的QQ号：");
     scanf("%d",&client_msg.to);
     if(search_friend(client_msg.to) ==  0 )
@@ -729,15 +776,17 @@ int my_friend(TT client_msg )
 
 int jiesan(TT client_msg)
 {
-    printf("\033c");
-    printf("\n\n\n\n\n\n\t\t\t\t请 输 入你 想 要 解 散 的 群 号：");
+    //printf("\033c");
+    printf("\n\n\n\n\n\n\t\t\t\t请 输 入 你 想 要 解 散 的 群 号：");
     scanf("%d",&client_msg.to);
 
     client_msg.flag = 13 ;
-    client_msg.state = -1;
+    //client_msg.state = -1;
+    client_msg.state = -100 ;
+    client_msg.QQ = I_QQ;
 
     send(I_conn_fd,&client_msg,sizeof(TT),0) ;
-    printf(YELLOW"\n\n\t\t\t\t申 请 已 发送 ， 请 耐 心 等  待 。 。 。。\n"END);
+    printf(YELLOW"\n\n\t\t\t\t 申 请 已 发送 ， 请 耐 心 等  待 。 。 。。\n"END);
     sleep(2);
 }
 
@@ -745,10 +794,10 @@ int jiesan(TT client_msg)
 
 int tiren(TT client_msg)
 {
-    printf("\033c");
+    //printf("\033c");
     printf("\n\n\n\n\n\n\t\t\t\t请 输 入  群 号：");
     scanf("%d",&client_msg.to);
-    printf("\n\n\t\t\t\t请 输 入 你 所要 踢 的 人 的 QQ 号:");
+    printf("\n\n\t\t\t\t请 输 入 你 所 要 踢 的 人 的 QQ 号:");
     scanf("%d",&client_msg.num);
     if(client_msg.num == I_QQ)
     {
@@ -757,7 +806,8 @@ int tiren(TT client_msg)
         return 0;
     }
     client_msg.flag= 14 ;
-    client_msg.state= -1;
+    //client_msg.state= -1;
+    client_msg.state= -100 ;
     send(I_conn_fd ,&client_msg,sizeof(TT),0) ;
     printf(YELLOW"\n\n\t\t\t\t申 请 已 发送 ， 请 耐 心 等  待 。 。 。。\n"END);
     sleep(2);
@@ -793,22 +843,45 @@ int my_create_group(TT client_msg)
 
 int real_qun_chat(TT client_msg)
 {
-    printf("\033c");
-    printf("\n\n\n\n\n\n\t\t\t\t请输入你想要聊天的群的群号：");
-    scanf("%d",&client_msg.to);
+    //printf("\033c");
+    client_msg.flag  =  9 ;
+    client_msg.state  =   -100 ; 
+    printf("\n\n\n\n\n\n\t\t\t\t请 输 入 你 想  要  聊  天  的 群 的 群 号 ： ");
+    scanf("%d",&client_msg.to) ;
 
+    qun_num = client_msg.to ;
+
+    send(I_conn_fd,&client_msg,sizeof(TT),0);     // frist check
+    ss= 0;
+    while(1)
+    {
+        sleep(1);
+        if(ss == 1 )  break;
+    }
+}
+
+int real_real_qun_chat(TT client_msg)
+{
+    //printf("\033c");
     client_msg.flag  =  9 ;
     client_msg.state =  -1 ;
 
+    printf("client_msg.to  ==  %d \n",client_msg.to );
+    //printf("client_msg.staet == %d \n",client_msg.state) ; 
+
+   
+
+    setbuf(stdin,NULL);
     printf(YELLOW"\n\n\t请输入你要发的消息(按回车键发送,输入exit 退出群聊)：\n"END);
-    qun_num  =   client_msg.to ;
     while(1)
     {
         printf(GREEN"I : "END);
         scanf("%s",&client_msg.str) ;
+       //printf("client_msg.state  == %d \n",client_msg.state);
         if(strcmp(client_msg.str,"exit") ==  0 )
         {
             qun_num  = 0 ;
+            ss =  1 ;
             return  0;
         }
         send(I_conn_fd,&client_msg,sizeof(TT),0);
@@ -817,12 +890,11 @@ int real_qun_chat(TT client_msg)
 
 
 
+
 int  invite_one(TT client_msg)
 {
-    printf("\033c");
-    printf("\n\n\n\n\n\n\t\t\t\t请 输 入 所 邀 群 号：");
-    scanf("%d",&client_msg.to);
-    printf("\n\t\t\t\t请 输 入 对 方 的 QQ 号：");  //在我的好友里面找对方
+    //printf("\033c");
+    printf("\n\n\n\n\n\n\t\t\t\t请 输 入 对 方 的 QQ 号：");  //在我的好友里面找对方
     scanf("%d",&client_msg.num);
     if(client_msg.num == I_QQ)
     {
@@ -836,11 +908,13 @@ int  invite_one(TT client_msg)
         sleep(1);
         return 0;
     }
+    printf("\n\t\t\t\t请 输 入 所 邀 群 号： " );
+    scanf("%d",&client_msg.to);
 
     client_msg.flag = 10 ;
-    client_msg.state = -1 ;
+    client_msg.state = -100 ;
 
-    send(I_conn_fd ,&client_msg,sizeof(TT),0);      //对方可同意也可拒绝～～ 
+    send(I_conn_fd ,&client_msg,sizeof(TT),0);   //对方可同意也可拒绝～～ 
 
     printf(YELLOW"\n\n\t\t\t\t好友邀请已发送，请耐心等待。。。。\n"END);
     sleep(2);
@@ -850,46 +924,44 @@ int  invite_one(TT client_msg)
 
 int lookup_qun_chat_record(TT client_msg)
 {
-    printf("\033c");
+    //printf("\033c");
     printf("\n\n\n\n\n\n\t\t\t\t请输入你要查看聊天记录的群号：");
-    scanf("%d",&client_msg.to);       //验证我是不是再这个群里面????????????????????????????
+    scanf("%d",&client_msg.to);       //验证我是不是再这个群里面
 
     client_msg.flag =  16 ;
-    client_msg.state = -1 ;
+    client_msg.state = -100  ;
 
     send(I_conn_fd,&client_msg,sizeof(TT),0) ;
-    sleep(10);
+    sleep( 2 );
 }
-
-
-
-
 
 int lookup_group_friend(TT client_msg)
 {
-    printf("\033c");
-    printf("\n\n\n\n\n\n\t\t\t\t请输入你要查看群成员的群号：");
+     //printf("\033c");
+    printf("\n\n\n\n\n\n\t\t\t\t请 输 入 你 要 查 看 群 成 员 的 群  号：");
     scanf("%d",&client_msg.to);
 
     client_msg.flag =  15 ;
-    client_msg.state = -1 ;
+    client_msg.state = -100 ;
 
     send(I_conn_fd,&client_msg,sizeof(TT),0 ) ;
     printf(YELLOW"\n\n\t\t\t\t请求已发送，请耐心等待。。。。\n"END);
-    sleep(10);
+    sleep(2);
 }
 
 int exit_qun(TT client_msg) //flag = 17 
 {
-    printf("\033c");
+    //printf("\033c");
     printf("\n\n\n\n\n\n\t\t\t\t请 输 入 你 想 要 退 出 的 群 的 群 号：");
     scanf("%d",&client_msg.to) ;
 
     client_msg.flag  =  17 ;
+    client_msg.state = -100 ;
+
     send(I_conn_fd,&client_msg,sizeof(TT),0) ;
 
-    sleep(1);
-    printf(YELLOW"\n\n\t\t\t\t你 已 成 功 退 出 群%d\n"END,client_msg.to);
+    /*sleep(1);
+    printf(YELLOW"\n\n\t\t\t\t你 已 成 功 退 出 群%d\n"END,client_msg.to);*/
     sleep(2);
 }
 
@@ -913,42 +985,44 @@ int my_add_group(TT client_msg)
         switch(choice)
         {
             case 1:/*lookup_add__group(conn_fd);*/      break;
-            case 2:invite_one(client_msg) ;             break;
-            case 3:real_qun_chat(client_msg) ;          break;
+            case 2:invite_one(client_msg) ;               break;
+            case 3:real_qun_chat(client_msg) ;           break;
             case 4:lookup_qun_chat_record(client_msg) ; break;
-            case 5:lookup_group_friend(client_msg);     break ;
-            case 6:exit_qun(client_msg) ;               break;
-            case 7:break;
+            case 5:lookup_group_friend(client_msg);      break ;
+            case 6:exit_qun(client_msg) ;                   break;
+            case 7:    break;
             default :printf(RED"\n\n\t\t\t\t输入有错～～～,请检查后重新输入！！！\n"END);  sleep(1) ;  break ;
         }
     }while(choice !=  7 );
     return 0;
 }
 
-int create_group(TT client_msg)  //创建群
+int create_group(TT client_msg)   //创建群
 {
     //printf("into create_group and client_msg.QQ == %d\n",client_msg.QQ);
-    printf("\033c");
+    //printf("\033c");
     printf("\n\n\n\n\n\n\t\t\t\t请输入你想要创建的群的群号：");
     scanf("%d",&client_msg.to) ; // to   代表群号
     client_msg.flag =  8 ;
     send(I_conn_fd,&client_msg,sizeof(TT),0) ;
     sleep(1);
-    printf(BLUE"\n\n\t\t\t\t建 群 成 功， 快 去 邀 请 新 成 员 加 入 吧 ！ ！\n"END) ;
+    printf(BLUE"\n\n\t\t\t\t 建  群  成  功 ， 快 去 邀 请 新 成 员 加 入 吧 ！ ！\n"END) ;
     sleep(2);
 }
 
 
+
+
 int add_group(TT client_msg)   //加群
 {
-    printf("\033c");
-    printf("\n\n\n\n\n\n\t\t\t\t请输入你想要加入的群的群号：");
+    //printf("\033c");
+    printf("\n\n\n\n\n\n\t\t\t\t请 输 入 你 想要 加 入 的 群 的 群 号  ： ");
     scanf("%d",&client_msg.to);
     client_msg.flag = 12 ;
-    client_msg.state = -1 ;
+    client_msg.state = -100 ;
     send(I_conn_fd,&client_msg,sizeof(TT),0);
     printf(BLUE"\n\n\t\t\t\t加 群 申 请 已 发送 ， 请 耐 心 等 待 群 主 同 意 \n"END);
-    sleep(2);
+   sleep(2);
 }
 
 
@@ -964,7 +1038,7 @@ int my_group(TT client_msg )
         printf("\t\t\t\t4.加群\n\n");
         printf("\t\t\t\t5:退出\n\n"END);
         printf("\t\t\t\t请输入你的选择：") ;
-        scanf("%d",&choice);
+        scanf("%d",&choice);     //如何解决输入字符就崩的问题呐？？？？？
         switch(choice)
         {
             case 1: create_group(client_msg);     break; //create_group 函数
@@ -977,6 +1051,7 @@ int my_group(TT client_msg )
     }while(choice !=  5);
     return  0;
 }
+
 /*****************************************消息盒子*******************************************/
 
 
@@ -1182,9 +1257,10 @@ int main(void)
     serve_addr.sin_family = AF_INET ;  
     serve_addr.sin_port = htons(SERVER_PORT) ; 
     serve_addr.sin_addr.s_addr= inet_addr(SERVER_IP) ;    //设置IP
-    conn_fd = socket(AF_INET,SOCK_STREAM ,0 );
 
+    conn_fd = socket(AF_INET,SOCK_STREAM ,0 );
     if(conn_fd < 0)  myerror("client  socket ",__LINE__);
+
     if(connect(conn_fd,(struct sockaddr *)&serve_addr,sizeof(struct sockaddr))   < 0)
         myerror("client connect ",__LINE__);  //连接套接字成功
 

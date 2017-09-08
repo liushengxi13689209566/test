@@ -22,6 +22,7 @@
 #include<mysql/mysql.h>
 #include <sys/epoll.h>
 #include<pthread.h>
+#include<signal.h>
 
 
 /*定义的宏*/
@@ -64,8 +65,11 @@ void myerror(const char *str ,int line)
 }
 void mysql_connect(MYSQL *mysql)
 {  
-    if(!mysql_real_connect(mysql, HOST, USER, PASSWD, DB_NAME, 0, NULL, 0)) {  
+    if(  !(mysql=mysql_real_connect(mysql, HOST, USER, PASSWD, DB_NAME, 0, NULL, 0) ) ) {  
              myerror("server mysql_real_connect", __LINE__);
+    mysql_query(mysql,"set names gbk");     //防止乱码。设置和数据库的编码一致就不会乱码
+    /*if(!mysql_real_connect(mysql, HOST, USER, PASSWD, DB_NAME, 0, NULL, 0)) {  
+             myerror("server mysql_real_connect", __LINE__);*/
     }  
 }  
 

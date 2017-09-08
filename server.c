@@ -17,6 +17,7 @@ int  online(int number ) ;    //查看对方是否在线,在线返回其套接�
 int look_friend(TT server_msg,int conn_fd);
 int look_chat_record(TT server_msg,int conn_fd) ;  // 11 和22 的聊天记录
 void add_one_massage(TT server_msg,int come_QQ ,int go_QQ) ;
+int qun_num_check(TT *server_msg,int conn_fd,int sp);     //解决将群名胡乱输入的问题 state ==  -100
 
 typedef struct User_list
 {
@@ -180,26 +181,78 @@ int add_user_list(TT server_msg,int conn_fd)
 /*********************************************************************群的处理***********************************/
 int create_group(TT server_msg,int conn_fd)  //flag ==  8
 {
-    //printf("server_msg.QQ == %d \n",server_msg.QQ) ;
-    //printf("server_msg.to == %d \n",server_msg.to) ;
+    /*printf("server_msg.QQ == %d \n",server_msg.QQ) ;
+    printf("server_msg.to == %d \n",server_msg.to) ;*/
+
     char query1[100];
     char query2[100];
+    char query3[100];
+
     int t ;
+
     memset(query1,0,sizeof(query1));
     memset(query2,0,sizeof(query2));
+    memset(query3,0,sizeof(query3));
+
     sprintf(query1,"create table qun_%d(user_QQ int unsigned primary key ,username char(32),mode int default 0 ) ;",server_msg.to);
     sprintf(query2,"insert into  qun_%d   values(%d ,NULL , 1) ;",server_msg.to,server_msg.QQ); 
+    sprintf(query3,"insert into  all_qun   values(%d ,%d , NULL) ;",server_msg.to,server_msg.QQ); 
     t= mysql_real_query(mysql ,query1,strlen(query1));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     t= mysql_real_query(mysql ,query2,strlen(query2));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    t= mysql_real_query(mysql ,query3,strlen(query3));
+    if(t != 0 )    myerror("server mysql_real_query",__LINE__);
 }
+
+
+
+
+
+
+
+int my_qun_check(TT *server_msg,int conn_fd,int sp)   //state  ==   -99    
+{
+    char query1[100];
+    int t ;
+
+    MYSQL_RES *res ;
+    MYSQL_ROW row ;
+    //printf("into qun_num_check and server_msg.to == %d \n",server_msg.to);
+
+    memset(query1,0,sizeof(query1));
+
+    sprintf(query1, "select * from  qun_%d  where user_QQ = %d ;",server_msg->to,server_msg->QQ ) ;
+
+    printf("query1 == %s \n",query1);
+
+    t= mysql_real_query(mysql ,query1,strlen(query1));
+
+    if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    res = mysql_store_result(mysql) ;
+    if( !res )     myerror("server mysql_store_result",__LINE__) ;
+
+    if(mysql_num_rows(res)  ==   0)     //胡乱输入
+    {
+        server_msg->state = -99;
+        send(conn_fd,server_msg,sizeof(TT),0) ;
+        return -1;
+    }
+    else     //没有胡乱输入                      
+    {
+        server_msg->state = sp ;  //   is right
+        return 0;
+    }
+}
+
+
 
 int real_qun_chat(TT server_msg ,int conn_fd)   //群聊转发
 {
-   /* printf("群号为：%d\n",server_msg.to);
+    printf("群号为：%d\n",server_msg.to);
     printf("QQ 为：%d\n",server_msg.QQ) ;
-    printf("消息为：%s\n",server_msg.str);*/
+    printf("消息为：%s\n",server_msg.str); 
+
     int t,i ,number;
     int temp ;
     int fd ;
@@ -207,11 +260,44 @@ int real_qun_chat(TT server_msg ,int conn_fd)   //群聊转发
     char query2[100];
     MYSQL_RES *res ;
     MYSQL_ROW row ;
+   
 
     memset(&query1,0,sizeof(query1));
     sprintf(query1,"select user_QQ from qun_%d ;",server_msg.to) ;
 
     sprintf(query2,"insert into  qun_chat_record (qun_num,come_QQ ,record) values(%d,%d,'%s') ;",server_msg.to,server_msg.QQ,server_msg.str) ;
+    if(server_msg.state  ==   -100)
+    {
+      
+        if(qun_num_check(&server_msg,conn_fd,-99) < 0 )  //代表胡乱输入
+              {
+                printf("state == %d \n",server_msg.state);
+                return  0 ;
+            }
+    }       //state = -99
+
+    if(server_msg.state  ==   -99)
+    {
+        printf("5555555\n");
+       // sp= -98 ;
+        if(my_qun_check(&server_msg,conn_fd,-98) < 0 )      //myself is not in this qun
+              {printf("state == %d \n",server_msg.state);
+            return  0 ;}
+    } //state = - 98  ;
+
+    if( server_msg.state  ==   -98 )    //验证群号成功，让客户端进行输入 ；
+    {
+        printf("6666\n");
+        server_msg.flag =  9 ;
+        send(conn_fd,&server_msg,sizeof(TT),0)  ;
+        printf("state == %d \n",server_msg.state);
+        return 0 ;
+        
+    } //state = - 1  ;
+
+    printf("777 \n");
+
+
 
     t= mysql_real_query(mysql ,query2,strlen(query2));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
@@ -222,6 +308,7 @@ int real_qun_chat(TT server_msg ,int conn_fd)   //群聊转发
     if( !res )     myerror("server mysql_store_result",__LINE__) ;
     t= mysql_num_rows(res);  //t 行
 
+  
     temp = server_msg.to;
     server_msg.state = -1 ;
 
@@ -242,6 +329,7 @@ int real_qun_chat(TT server_msg ,int conn_fd)   //群聊转发
         else add_one_massage(server_msg , temp, number);     //对方不在线,当作离线消息处理
     }
 }
+
 
 
 
@@ -277,6 +365,19 @@ int invite_one(TT server_msg ,int conn_fd)     //flag ==  10
     sprintf(query1, "insert into  qun_%d (user_QQ ,mode) values(%d,0) ;",server_msg.to,server_msg.QQ) ;
     sprintf(query3, "select  *   from qun_%d  where user_QQ= %d ;",server_msg.to,server_msg.num) ;
 
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,-99) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
+    if(server_msg.state  ==   -99)
+    {
+        if(my_qun_check(&server_msg,conn_fd,-1 ) < 0 )      //myself is not in this qun
+              {printf("state == %d \n",server_msg.state);
+            return  0 ;}
+    } //state = -1 ;
+
+
     t= mysql_real_query(mysql ,query3,strlen(query3));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     res = mysql_store_result(mysql) ;
@@ -303,13 +404,50 @@ int invite_one(TT server_msg ,int conn_fd)     //flag ==  10
 
 
 
+int qun_num_check(TT *server_msg,int conn_fd,int sp)     //解决将群名胡乱输入的问题 state ==  -100
+{
+    char query1[100];
+    int t ;
+
+    MYSQL_RES *res ;
+    MYSQL_ROW row ;
+    //printf("into qun_num_check and server_msg.to == %d \n",server_msg.to);
+
+    memset(query1,0,sizeof(query1));
+
+    sprintf(query1, "select * from  all_qun where qun_num= %d ;",server_msg->to) ;
+
+    //printf("query1 == %s \n",query1);
+
+    t= mysql_real_query(mysql ,query1,strlen(query1));
+
+    if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    res = mysql_store_result(mysql) ;
+    if( !res )     myerror("server mysql_store_result",__LINE__) ;
+
+    if(mysql_num_rows(res)  ==   0)     //胡乱输入
+    {
+        server_msg->state = -100 ;
+        send(conn_fd,server_msg,sizeof(TT),0) ;
+        return -1;
+    }
+    else     //没有胡乱输入                      
+    {
+        server_msg->state = sp ;
+        return 0;
+    }
+}
+
 
 int add_group(TT server_msg ,int conn_fd)     //加群的转发中心
 {
+    printf("***************************server_msg.flag == %d \n",server_msg.flag);
     int fd ,t  ;
+    int sp =  -1 ;
     char query1[100];
     char query2[100];
     char query3[100];
+
     MYSQL_RES *res ;
     MYSQL_ROW row ;
 
@@ -321,6 +459,15 @@ int add_group(TT server_msg ,int conn_fd)     //加群的转发中心
     sprintf(query1, "insert into  qun_%d (user_QQ ,mode) values(%d,0) ;",server_msg.to,server_msg.num) ;
     sprintf(query2, "select  user_QQ from qun_%d  where mode= 1 ;",server_msg.to ) ;
     sprintf(query3, "select  *   from qun_%d  where user_QQ= %d ;",server_msg.to,server_msg.QQ ) ;
+
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,sp) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
+    //printf("改变后的state == %d \n",server_msg.state);
+
+  
 
     t= mysql_real_query(mysql ,query3,strlen(query3));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
@@ -349,52 +496,61 @@ int add_group(TT server_msg ,int conn_fd)     //加群的转发中心
     }
     if( (fd = online(server_msg.num) ))  //对方也在线 , flag  ==  12
     {   
-        if(server_msg.state  ==  1 ) //群主同意加入
+        if(server_msg.state  ==  1 )    //群主同意加入
         {
             if( mysql_real_query(mysql ,query1,strlen(query1)) !=  0)       myerror("server mysql_real_query",__LINE__);
         }    
         send(fd,&server_msg,sizeof(TT),0) ;
     }
-  //else add_one_massage();     //对方不在线,当作离线消息处理 
-   
+  //else add_one_massage();     //对方不在线,当作离线消息处理   
 }
-
-
-
 
 
 int jiesan(TT server_msg ,int conn_fd)
 {
     int t ;
+    int sp = -1 ;
     char query1[100];
+    char query2[100];
     char query3[100];
 
     MYSQL_RES *res ;
 
-   /* printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
+    printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
     printf("server_msg.QQ == %d\n",server_msg.QQ); //我的QQ
     printf("server_msg.to == %d\n",server_msg.to); //群号
     //printf("server_msg.num == %d\n",server_msg.num); //对方的QQ*/
 
     sprintf(query1, "drop table  qun_%d ;",server_msg.to ) ;
+    sprintf(query2, "delete from all_qun where qun_num= %d and qun_zhu_QQ= %d ;",server_msg.to,server_msg.QQ ) ;
     sprintf(query3, "select  *   from qun_%d  where user_QQ= %d and mode= 1 ;",server_msg.to,server_msg.QQ) ;
-
+    //printf("query2 == %s \n",query2);
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,sp) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
+    printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
+    printf("server_msg.QQ == %d\n",server_msg.QQ); //我的QQ
+    printf("server_msg.to == %d\n",server_msg.to); //群号
     t= mysql_real_query(mysql ,query3,strlen(query3));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     res = mysql_store_result(mysql) ;
     if( !res )     myerror("server mysql_store_result",__LINE__) ;
-   // printf("mysql_num_rows ==%d \n" ,mysql_num_rows(res)); //  !=  0 ，代表已经加入
+   // printf("mysql_num_rows ==%d \n" ,mysql_num_rows(res));  //  !=  0 ，代表已经加入
 
-    if(mysql_num_rows(res) == 0 )
+    if( mysql_num_rows(res) ==  0 )
     {
-        server_msg.state = -2 ; 
+        server_msg.state = -2 ;  //bu shi qun zhu  
 
         send(conn_fd,&server_msg,sizeof(TT),0) ;
 
         return 0 ;
     }
-    else{ 
+    else{   //is qun zhu 
         if( mysql_real_query(mysql ,query1,strlen(query1)) !=  0)       
+        myerror("server mysql_real_query",__LINE__);
+        if( mysql_real_query(mysql ,query2,strlen(query2)) !=  0)       
         myerror("server mysql_real_query",__LINE__);
         send(conn_fd,&server_msg,sizeof(TT),0) ;
     }
@@ -404,6 +560,7 @@ int jiesan(TT server_msg ,int conn_fd)
 int tiren(TT server_msg ,int conn_fd)     //flag ==  14
 {
     int t,fd ;
+    int sp = -1 ;
     char query1[100];
     char query2[100];
     char query3[100];
@@ -418,7 +575,11 @@ int tiren(TT server_msg ,int conn_fd)     //flag ==  14
     sprintf(query1, "delete from qun_%d  where user_QQ = %d  ;",server_msg.to,server_msg.num ) ;
     sprintf(query2, "select *  from  qun_%d  where user_QQ =%d ;",server_msg.to,server_msg.num ) ;
     sprintf(query3, "select  *   from qun_%d  where user_QQ= %d and mode= 1 ;",server_msg.to,server_msg.QQ) ;
-
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,sp) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
     t= mysql_real_query(mysql ,query3,strlen(query3));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     res = mysql_store_result(mysql) ;
@@ -459,14 +620,10 @@ int tiren(TT server_msg ,int conn_fd)     //flag ==  14
     }
 }
 
-
-
-
-
-
 int look_group_friend(TT server_msg ,int conn_fd)     //flag ==  15
 {
     int t,fd, i ;
+    int sp = -1 ;
     char query1[100];
     char query2[100];
 
@@ -479,7 +636,11 @@ int look_group_friend(TT server_msg ,int conn_fd)     //flag ==  15
 
     sprintf(query1, "select user_QQ  from qun_%d   ;",server_msg.to  ) ;
     sprintf(query2, "select *  from  qun_%d  where user_QQ =%d ;",server_msg.to,server_msg.QQ ) ;
-
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,sp) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
     t= mysql_real_query(mysql ,query2,strlen(query2));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     res = mysql_store_result(mysql) ;
@@ -510,7 +671,7 @@ int look_group_friend(TT server_msg ,int conn_fd)     //flag ==  15
     }
 }
 
-int lookup_qun_chat_record(TT server_msg ,int conn_fd) //flag ==  16
+int lookup_qun_chat_record(TT server_msg ,int conn_fd)   //flag ==  16
 {
 
     int t ,i;
@@ -523,6 +684,18 @@ int lookup_qun_chat_record(TT server_msg ,int conn_fd) //flag ==  16
     MYSQL_RES *res ;
     MYSQL_ROW row ;
     sprintf(query1, "select  *   from  qun_chat_record  where qun_num = %d  ;",server_msg.to) ;
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,-99) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
+
+    if(server_msg.state  ==   -99)
+    {
+        if(my_qun_check(&server_msg,conn_fd,-1 ) < 0 )      //myself is not in this qun
+              {printf("state == %d \n",server_msg.state);
+            return  0 ;}
+    } //state = - 1  ;
 
     t= mysql_real_query(mysql ,query1,strlen(query1));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
@@ -544,13 +717,20 @@ int lookup_qun_chat_record(TT server_msg ,int conn_fd) //flag ==  16
 
 
 
-int exit_qun(TT server_msg ,int conn_fd)
+int exit_qun(TT server_msg ,int conn_fd) //flag == 17 
 {
     char query1[100];
     int t ;
     sprintf(query1, "delete  from  qun_%d  where user_QQ  = %d  ;",server_msg.to,server_msg.QQ) ;
+    if(server_msg.state  ==   -100)
+    {
+        if(qun_num_check(&server_msg,conn_fd,-1 ) < 0 )  //代表胡乱输入
+            return  0 ;
+    }
+    server_msg.state = -1 ;
     t= mysql_real_query(mysql ,query1,strlen(query1));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    send(conn_fd,&server_msg,sizeof(TT),0) ; //发送
 }
 
 
@@ -891,8 +1071,10 @@ int main(void )     //服务器端忽略客户端异常下线的情况
     socklen_t clilen ; 
     struct sockaddr_in clientaddr ;    //客户机地址
     struct sockaddr_in serveraddr ;     //服务器地址
-    struct epoll_event ev, events[MAXEVENTS]; 
+    struct epoll_event ev, events[MAXEVENTS];
+
     head = init_list() ;
+
     sock_fd = socket(AF_INET, SOCK_STREAM, 0); 
     if(sock_fd  <  0 ) myerror("server socket ",__LINE__);
     
@@ -909,17 +1091,20 @@ int main(void )     //服务器端忽略客户端异常下线的情况
         myerror("server bind ",__LINE__);
     if(listen(sock_fd , LISTENQ) <  0) 
         myerror("server listen ",__LINE__);
-    epfd = epoll_create(256);
 
+    epfd = epoll_create(256);
     ev.data.fd = sock_fd;
     ev.events= EPOLLIN  ;
 
-    mysql = mysql_init(NULL); //打开数据库
+    mysql = mysql_init(NULL);   //打开数据库
     if(!mysql)   myerror("server mysql_init",__LINE__);
     mysql_connect(mysql) ;
 //    char conn[50]= "set user_data utf8" ;  //使数据库支持中文
   //  mysql_real_query(mysql,conn,strlen(conn));
     epoll_ctl(epfd,EPOLL_CTL_ADD,sock_fd,&ev);  //加入
+
+    signal(SIGPIPE,SIG_IGN);
+
     pthread_t tid ;
     clilen = sizeof(struct sockaddr_in) ;
     for ( ; ; )
