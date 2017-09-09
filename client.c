@@ -194,7 +194,7 @@ int get_group_chat( TT client_msg)
 
 int get_one_file( TT client_msg)
 {
-    printf("**************************************************************************\n");
+    //printf("**************************************************************************\n");
     if(client_msg.to  ==  to_who)
     {
         printf(PURPLE"\t 好友%d 给你发来文件%s\n"END,client_msg.QQ,client_msg.passwd);
@@ -228,20 +228,21 @@ int my_recv(void)
         case 9:
            if(massage.state ==   -100 )
             {
-                ss= 1 ;  
+                ss= 0 ;  
                 printf(RED"\t 查 无 此 群 ，该  打 ！！\n"END);
             }
             else  if(massage.state ==   -99  )
             {  
                 printf(RED"\t  亲，您  不  在   此   群   中  哦  ！！\n"END) ;    
-                ss= 1 ; 
+                ss= 0 ; 
             }
              else if(massage.state  ==  -98  )
              {
-                while(1){
+                /*while(1){
                     if (real_real_qun_chat(massage) == 0)
                         break;
-                }
+                }*/
+                ss=1 ; 
             }
             else 
                 get_group_chat(massage);  //群聊消息
@@ -441,8 +442,10 @@ int keep_file(TT client_msg)
     int fd  ;
     sprintf(file_name,"/home/liushengxi/test/test_1/%d_%s",I_QQ,client_msg.passwd);
 
-    if( ( fd = open(file_name,O_RDWR | O_APPEND | O_CREAT ,S_IRUSR | S_IWUSR) ) < 0 )
-        myerror("in keep_file open ",__LINE__);
+    //if( ( fd = open(file_name,O_RDWR | O_APPEND | O_CREAT ,S_IRUSR | S_IWUSR) ) < 0 )
+       // myerror("in keep_file open ",__LINE__);
+     if( ( fd = open(file_name,O_RDWR | O_APPEND | O_CREAT ,0666) ) < 0 )
+       myerror("in keep_file open ",__LINE__);
 
     write(fd ,client_msg.str,client_msg.num);
 
@@ -454,7 +457,7 @@ int send_file(TT client_msg ,int file_fd)
     int sum = 0 ,file_len = 0,sum_len = 0  ;     //sum_len 总文件长度，file_len 每次发送的文件长度 
     int  i ;
     char temp[32];
-    char read_buf[129] ;
+    char read_buf[128] ;
 
     memset(read_buf,0,sizeof(read_buf));
     memset(temp,0,sizeof(temp));
@@ -485,10 +488,12 @@ int send_file(TT client_msg ,int file_fd)
         client_msg.state  = -1 ;
 
         send(I_conn_fd,&client_msg,sizeof(TT),0) ;
-        usleep(10000);
+        //printf("**********************\n");
+        usleep(15000);
+        //usleep(10000); //error
     }
    
-    printf(BLUE"\n\n\t\t\t\t传 输 文 件 结 束 < < < < "END);
+    printf(BLUE"\n\n\t\t\t\t传 输 文 件 结 束 < < < < \n"END);
     strcpy(client_msg.passwd,temp);
     client_msg.to = to_who ;
     client_msg.QQ = I_QQ ;
@@ -530,7 +535,7 @@ int init_file(TT client_msg)
         return 0;
     }
 
-    printf(YELLOW"\n\n\t\t\t\t传 输 文 件 开 始 > > > > > "END);
+    printf(YELLOW"\n\n\t\t\t\t传 输 文 件 开 始 > > > > > \n"END);
 
     int temp ;
     temp = strlen(name);
@@ -856,7 +861,13 @@ int real_qun_chat(TT client_msg)
     while(1)
     {
         sleep(1);
-        if(ss == 1 )  break;
+       // if(ss == 1 )  break;
+        if(ss == 1 )  
+        { 
+            if(real_real_qun_chat(client_msg) == 0 )
+                    break;
+        }
+        else break ;
     }
 }
 
@@ -866,11 +877,8 @@ int real_real_qun_chat(TT client_msg)
     client_msg.flag  =  9 ;
     client_msg.state =  -1 ;
 
-    printf("client_msg.to  ==  %d \n",client_msg.to );
+    //printf("client_msg.to  ==  %d \n",client_msg.to );
     //printf("client_msg.staet == %d \n",client_msg.state) ; 
-
-   
-
     setbuf(stdin,NULL);
     printf(YELLOW"\n\n\t请输入你要发的消息(按回车键发送,输入exit 退出群聊)：\n"END);
     while(1)

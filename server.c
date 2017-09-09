@@ -258,7 +258,7 @@ int my_qun_check(TT *server_msg,int conn_fd,int sp)   //state  ==   -99
 
     sprintf(query1, "select * from  qun_%d  where user_QQ = %d ;",server_msg->to,server_msg->QQ ) ;
 
-    printf("query1 == %s \n",query1);
+   // printf("query1 == %s \n",query1);
 
     t= mysql_real_query(mysql ,query1,strlen(query1));
 
@@ -283,9 +283,9 @@ int my_qun_check(TT *server_msg,int conn_fd,int sp)   //state  ==   -99
 
 int real_qun_chat(TT server_msg ,int conn_fd)   //群聊转发
 {
-    printf("群号为：%d\n",server_msg.to);
+   /* printf("群号为：%d\n",server_msg.to);
     printf("QQ 为：%d\n",server_msg.QQ) ;
-    printf("消息为：%s\n",server_msg.str); 
+    printf("消息为：%s\n",server_msg.str); */
 
     int t,i ,number;
     int temp ;
@@ -305,31 +305,30 @@ int real_qun_chat(TT server_msg ,int conn_fd)   //群聊转发
       
         if(qun_num_check(&server_msg,conn_fd,-99) < 0 )  //代表胡乱输入
               {
-                printf("state == %d \n",server_msg.state);
+                //printf("state == %d \n",server_msg.state);
                 return  0 ;
             }
     }       //state = -99
 
     if(server_msg.state  ==   -99)
     {
-        printf("5555555\n");
+        //printf("5555555\n");
        // sp= -98 ;
         if(my_qun_check(&server_msg,conn_fd,-98) < 0 )      //myself is not in this qun
-              {printf("state == %d \n",server_msg.state);
-            return  0 ;}
+                return  0 ;
     } //state = - 98  ;
 
     if( server_msg.state  ==   -98 )    //验证群号成功，让客户端进行输入 ；
     {
-        printf("6666\n");
+        //printf("6666\n");
         server_msg.flag =  9 ;
         send(conn_fd,&server_msg,sizeof(TT),0)  ;
-        printf("state == %d \n",server_msg.state);
+        //printf("state == %d \n",server_msg.state);
         return 0 ;
         
     } //state = - 1  ;
 
-    printf("777 \n");
+   // printf("777 \n");
 
 
 
@@ -407,8 +406,7 @@ int invite_one(TT server_msg ,int conn_fd)     //flag ==  10
     if(server_msg.state  ==   -99)
     {
         if(my_qun_check(&server_msg,conn_fd,-1 ) < 0 )      //myself is not in this qun
-              {printf("state == %d \n",server_msg.state);
-            return  0 ;}
+            return  0 ;
     } //state = -1 ;
 
 
@@ -475,7 +473,7 @@ int qun_num_check(TT *server_msg,int conn_fd,int sp)     //解决将群名胡乱
 
 int add_group(TT server_msg ,int conn_fd)     //加群的转发中心
 {
-    printf("***************************server_msg.flag == %d \n",server_msg.flag);
+    //printf("***************************server_msg.flag == %d \n",server_msg.flag);
     int fd ,t  ;
     int sp =  -1 ;
     char query1[100];
@@ -550,7 +548,7 @@ int jiesan(TT server_msg ,int conn_fd)
 
     MYSQL_RES *res ;
 
-    printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
+    /*printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
     printf("server_msg.QQ == %d\n",server_msg.QQ); //我的QQ
     printf("server_msg.to == %d\n",server_msg.to); //群号
     //printf("server_msg.num == %d\n",server_msg.num); //对方的QQ*/
@@ -564,9 +562,9 @@ int jiesan(TT server_msg ,int conn_fd)
         if(qun_num_check(&server_msg,conn_fd,sp) < 0 )  //代表胡乱输入
             return  0 ;
     }
-    printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
+    /*printf("server_msg.state == %d \n",server_msg.state); // -1 邀请 1同意 2不同意
     printf("server_msg.QQ == %d\n",server_msg.QQ); //我的QQ
-    printf("server_msg.to == %d\n",server_msg.to); //群号
+    printf("server_msg.to == %d\n",server_msg.to); //群号*/
     t= mysql_real_query(mysql ,query3,strlen(query3));
     if(t != 0 )    myerror("server mysql_real_query",__LINE__);
     res = mysql_store_result(mysql) ;
@@ -727,8 +725,7 @@ int lookup_qun_chat_record(TT server_msg ,int conn_fd)   //flag ==  16
     if(server_msg.state  ==   -99)
     {
         if(my_qun_check(&server_msg,conn_fd,-1 ) < 0 )      //myself is not in this qun
-              {printf("state == %d \n",server_msg.state);
-            return  0 ;}
+            return  0 ;
     } //state = - 1  ;
 
     t= mysql_real_query(mysql ,query1,strlen(query1));
