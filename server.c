@@ -30,6 +30,7 @@ U_L *head;
 MYSQL *mysql ;
 char IP[100];
 
+
 U_L *init_list()
 {
     U_L *temp ;
@@ -129,7 +130,7 @@ int del_user(int conn_fd)
 }
 
 
-int logout(TT server_msg ,int conn_fd) //flag == 3 
+int logout(TT server_msg ,int conn_fd)    //flag == 3 
 {
     char query1[100] ;
     int t;
@@ -151,6 +152,39 @@ int logout(TT server_msg ,int conn_fd) //flag == 3
     //print() ;
     return 0;
 }
+
+
+
+
+void  warning_logout(TT server_msg ,int conn_fd)    // flag is not  know 
+{
+    /*char query1[100] ;
+    int t;
+    memset(query1,0,sizeof(query1));
+    sprintf(query1,"insert into system_log (user_QQ,record )   values( %d,'sign out  wraning ');",server_msg.QQ  ); //退出登录
+
+    printf("server_msg.state == %d \n",server_msg.state);
+    printf("server_msg.QQ == %d\n",server_msg.QQ);
+    printf("server_msg.to == %d\n",server_msg.to); */
+    //printf("conn_fd  == %d\n",conn_fd); 
+
+    //if(server_msg.QQ   ==  0 )     //取消连接,仅仅是连接上了，还没有用户存在，也就是还没有放入在线用户的链表中
+    //{    
+        del_user(conn_fd);
+        printf(RED"\t\t  IP(%s)  异   常  断  开   连   接 ( 该 连 接 的 用 户  被 强 制  性 退 出) ！！ \n"END,IP );
+        close(conn_fd);
+    //}
+    /*else         //退出登录，但套接字还连接着
+    {
+        del_user(conn_fd);
+        printf(GREEN"\t\t %d  异  常  掉   线 ，怀  疑  可 能 是  被  人  干  掉  了 ～ ～  \n"END,server_msg.QQ ) ;
+        t= mysql_real_query(mysql ,query1,strlen(query1));
+        if(t != 0 )    myerror("server mysql_real_query",__LINE__);
+    }*/
+    //print() ;
+    //return 0;
+}
+
 
 
 
@@ -821,9 +855,10 @@ int  *fun(int *arg)
     int conn_fd = *(int *)arg ;
     int t ;
     memset(&server_msg,0,sizeof(TT));
-    t = recv(conn_fd,&server_msg,sizeof(TT),0) ; ///////////接受信息!!!!!!!!!!!!!!!
+    t = recv(conn_fd,&server_msg,sizeof(TT),0) ;   ///////////接受信息!!!!!!!!!!!!!!!
     if(t == 0)   
-        ;
+        warning_logout(server_msg ,conn_fd);
+
     //printf("****************************flag  ==  %d\n",server_msg.flag);
     switch(server_msg.flag)
     {
@@ -1103,7 +1138,7 @@ int main(void )     //服务器端忽略客户端异常下线的情况
   //  mysql_real_query(mysql,conn,strlen(conn));
     epoll_ctl(epfd,EPOLL_CTL_ADD,sock_fd,&ev);  //加入
 
-    signal(SIGPIPE,SIG_IGN);
+    //signal(SIGPIPE,SIG_IGN);
 
     pthread_t tid ;
     clilen = sizeof(struct sockaddr_in) ;
@@ -1127,9 +1162,10 @@ int main(void )     //服务器端忽略客户端异常下线的情况
             }
             else if(events[i].events&EPOLLIN) //如果是已经连接的用户，并且收到数据，那么进行读入
             {
-                conn_fd =  events[i].data.fd ;
-                if(pthread_create(&tid,NULL ,(void *)fun ,(void *)&conn_fd)   < 0  )      
+                //conn_fd =  events[i].data.fd ;
+                if(pthread_create(&tid,NULL ,(void *)fun ,(void *)&events[i].data.fd )   < 0  )      
                           myerror("server pthread_create ",__LINE__);
+                pthread_detach(tid);                 //在线程外部调用,回收资源
             }
         }
     }

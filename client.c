@@ -15,7 +15,7 @@ int  to_who ;
 U_L  *head ; //好友列表头指针
 TT  *mhead ; //消息盒子头指针
 int  qun_num ; //群号
-int ss= 0 ;
+int ss = 0 ;
  
 
 TT  *init_mhead()
@@ -132,7 +132,7 @@ int client_sign(int conn_fd)    //登录
     send(conn_fd,&client_msg,sizeof(TT), 0); //登录等待
 
     recv(conn_fd,&client_msg,sizeof(TT),0);
-    printf(GREEN"\n\t\t\t\t%s\n"END,client_msg.str);     //打印登录成功或者失败的信息
+    printf(GREEN"\n\t\t\t\t%s\n"END,client_msg.str);    //打印登录成功或者失败的信息
     sleep(2);
     if(client_msg.flag  ==  2 )     // 代表登录成功！！
     {
@@ -356,7 +356,7 @@ int my_recv(void)
             } else if(massage.state == 2) {
                 printf(RED"\t%d拒绝进入群%d\n"END,massage.num ,massage.to);
             } else if(massage.state == 1) {
-                printf(RED"\t%d同意进入群%d\n"END,massage.num ,massage.to);
+                printf(RED"\t%d同意进入群%d\n"END,massage.QQ ,massage.to);
             } else if(massage.state == -2) {
                 printf(RED"\t%d已是该群成员,无需重复邀请\n"END,massage.num);
             }
@@ -382,7 +382,7 @@ int lookup_offline_record(TT client_msg)
     client_msg.flag  = 19 ;
     printf("\n\n\n");
     send(I_conn_fd,&client_msg,sizeof(TT),0);
-    sleep(8);
+    sleep(5);
     return 0;
 
 }
@@ -1271,7 +1271,7 @@ int main(void)
 
    do
     {
-        printf("\033c");
+        //printf("\033c");
         printf(GREEN"\n\n\n\n\n\n\n\n\t\t\t\t\t\t欢 迎 来 到 为 你 精 心 打 造 的 聊 天 室 \n\n"END);
         printf(YELLOW"\t\t\t\t\t\t\t    0.  注   册\n"END);
         printf(BLUE  "\t\t\t\t\t\t\t    1.  登   录\n"END);        //登录完成再进行各种处理
