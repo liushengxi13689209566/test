@@ -72,7 +72,6 @@ int print()
     }
 }
 
-
 int add_friend(TT server_msg ,int conn_fd)     //添加好友消息的转发中心
 {
     int fd ,t ;
@@ -882,9 +881,6 @@ int  *fun(int *arg)
         default: break;
     }
 }
-
-
-
 
 
 int look_chat_record(TT server_msg,int conn_fd)  // 11 和22 的聊天记录,flag == 7 

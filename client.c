@@ -440,7 +440,7 @@ int keep_file(TT client_msg)
     printf("client_msg.str == %s \n",client_msg.str);*/
 
     int fd  ;
-    sprintf(file_name,"/home/liushengxi/test/test_1/%d_%s",I_QQ,client_msg.passwd);
+    sprintf(file_name,"/home/liushengxi/test/%d_%s",I_QQ,client_msg.passwd);
 
     //if( ( fd = open(file_name,O_RDWR | O_APPEND | O_CREAT ,S_IRUSR | S_IWUSR) ) < 0 )
        // myerror("in keep_file open ",__LINE__);
