@@ -29,7 +29,7 @@
 #define HOST    "localhost"
 #define USER    "root"
 #define DB_NAME  "chatroom"      // 以 root  的身份登录，只控制 chatroom 数据库
-#define	PASSWD    "thq520&iwwfyfF"
+#define	PASSWD    "thq520&iwwfyf"
 
 #define END          "\e[0m"
 #define RED           "\e[1;31m"
